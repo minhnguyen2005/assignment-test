@@ -17,7 +17,7 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * @author admin
  */
-@WebServlet(urlPatterns = {"/MainController","/mc","/"})
+@WebServlet(urlPatterns = {"/MainController","/mc",""})
 public class MainController extends HttpServlet {
 
     private static final String Welcome = "home.jsp";
