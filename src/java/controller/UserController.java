@@ -11,6 +11,15 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import model.UserDTO;
+import utils.DbUtils;
+import org.mindrot.jbcrypt.BCrypt;
+import model.UserDAO;
 
 /**
  *
@@ -19,30 +28,31 @@ import jakarta.servlet.http.HttpServletResponse;
 @WebServlet(name = "UserController", urlPatterns = {"/UserController"})
 public class UserController extends HttpServlet {
 
-    /**
-     * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
-     * methods.
-     *
-     * @param request servlet request
-     * @param response servlet response
-     * @throws ServletException if a servlet-specific error occurs
-     * @throws IOException if an I/O error occurs
-     */
+    private static final String HOME = "home.jsp";
+    private static final String LOGIN_PAGE = "login.jsp";
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
-        try ( PrintWriter out = response.getWriter()) {
-            /* TODO output your page here. You may use following sample code. */
-            out.println("<!DOCTYPE html>");
-            out.println("<html>");
-            out.println("<head>");
-            out.println("<title>Servlet UserController</title>");            
-            out.println("</head>");
-            out.println("<body>");
-            out.println("<h1>Servlet UserController at " + request.getContextPath() + "</h1>");
-            out.println("</body>");
-            out.println("</html>");
+        String url = LOGIN_PAGE;
+        try {
+            String action = request.getParameter("action");
+            if ("login".equals(action)) {
+                url = handleLogin(request, response);
+            } else if ("logout".equals(action)) {
+                url = handleLogout(request, response);
+            } else if ("register".equals(action)) {
+                url = handleRgister(request, response);
+            } else {
+                request.setAttribute("message", "Invalid action:" + action);
+                url = LOGIN_PAGE;
+            }
+        } catch (Exception e) {
+
+        } finally {
+            request.getRequestDispatcher(url).forward(request, response);
         }
+
     }
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
@@ -83,5 +93,81 @@ public class UserController extends HttpServlet {
     public String getServletInfo() {
         return "Short description";
     }// </editor-fold>
+
+    private String handleLogin(HttpServletRequest request, HttpServletResponse response) {
+        String url = LOGIN_PAGE;
+        HttpSession session = request.getSession();
+        String username = request.getParameter("strUserName");
+        String pass = request.getParameter("strPassword");
+
+        UserDAO userDAO = new UserDAO();
+
+        if (userDAO.login(username, pass)) {
+            url = HOME;
+            UserDTO user = userDAO.getUserByUserName(username);
+            session.setAttribute("user", user);
+        } else {
+            url = LOGIN_PAGE;
+            request.setAttribute("message", "Username or Password incorect");
+        }
+        return url;
+    }
+
+    private String handleLogout(HttpServletRequest request, HttpServletResponse response) {
+        HttpSession session = request.getSession(false); 
+        if (session != null) {
+            session.invalidate();
+        }
+       
+        return LOGIN_PAGE;
+    }
+
+    private String handleRgister(HttpServletRequest request, HttpServletResponse response) {
+        String url = LOGIN_PAGE;
+        try {
+            // 1. Get form data
+            String name = request.getParameter("name");
+            String email = request.getParameter("email");
+            String password = request.getParameter("password");
+            String address = request.getParameter("address");
+            String phoneNumber = request.getParameter("phoneNumber");
+
+            // 2. Hash the password
+            String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+
+            // 3. Set default values
+            String role = "user";
+            Timestamp createdAt = Timestamp.valueOf(LocalDateTime.now());
+
+            // 4. Save user to database
+            Connection conn = DbUtils.getConnection();
+            String sql = "INSERT INTO tblUsers (name, email, password, address, phoneNumber, role, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+
+            ps.setString(1, name);
+            ps.setString(2, email);
+            ps.setString(3, hashedPassword);
+            ps.setString(4, address);
+            ps.setString(5, phoneNumber);
+            ps.setString(6, role);
+            ps.setTimestamp(7, createdAt);
+
+            int result = ps.executeUpdate();
+
+            if (result > 0) {
+                request.setAttribute("message", "Registration successful. Please login.");
+            } else {
+                request.setAttribute("message", "Registration failed. Try again.");
+            }
+
+            ps.close();
+            conn.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            request.setAttribute("message", "Error: " + e.getMessage());
+        }
+        return LOGIN_PAGE;
+    }
 
 }
