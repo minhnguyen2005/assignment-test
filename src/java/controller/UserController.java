@@ -94,31 +94,41 @@ public class UserController extends HttpServlet {
         return "Short description";
     }// </editor-fold>
 
-    private String handleLogin(HttpServletRequest request, HttpServletResponse response) {
-        String url = LOGIN_PAGE;
-        HttpSession session = request.getSession();
-        String username = request.getParameter("strUserName");
-        String pass = request.getParameter("strPassword");
+   private String handleLogin(HttpServletRequest request, HttpServletResponse response) {
+    String url = LOGIN_PAGE; 
+    try {
+        // Get input values
+        String username = request.getParameter("username");  // make sure your JSP input is named "username"
+        String password = request.getParameter("password");
 
-        UserDAO userDAO = new UserDAO();
+        // Call DAO
+        UserDAO dao = new UserDAO();
+        UserDTO user = dao.getUserByUsername(username); 
 
-        if (userDAO.login(username, pass)) {
-            url = HOME;
-            UserDTO user = userDAO.getUserByUserName(username);
-            session.setAttribute("user", user);
+        // Check hashed password
+        if (user != null && org.mindrot.jbcrypt.BCrypt.checkpw(password, user.getPassword())) {
+            HttpSession session = request.getSession();
+            session.setAttribute("USER", user);
+            url = HOME; 
         } else {
-            url = LOGIN_PAGE;
-            request.setAttribute("message", "Username or Password incorect");
+            request.setAttribute("message", "Invalid username or password.");
         }
-        return url;
+    } catch (Exception e) {
+        e.printStackTrace();
+        request.setAttribute("message", "An error occurred: " + e.getMessage());
     }
 
+    return url;
+}
+
+
+
     private String handleLogout(HttpServletRequest request, HttpServletResponse response) {
-        HttpSession session = request.getSession(false); 
+        HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
         }
-       
+
         return LOGIN_PAGE;
     }
 

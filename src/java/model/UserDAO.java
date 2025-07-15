@@ -4,13 +4,13 @@
  */
 package model;
 
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import org.mindrot.jbcrypt.BCrypt;
 import utils.DbUtils;
 
 /**
@@ -24,40 +24,42 @@ public class UserDAO {
     }
 
     public boolean login(String username, String password) {
-        UserDTO user = getUserByUserName(username);
-        if (user != null & user.getPassword().equals(password)) {
+        UserDTO user = getUserByUsername(username);
+        if (user != null && BCrypt.checkpw(password, user.getPassword())) {
             return true;
         }
         return false;
     }
 
-    public UserDTO getUserByUserName(String userName) {
+    public UserDTO getUserByUsername(String username) {
         UserDTO user = null;
         try {
-            String sql = "SELECT * FROM Users WHERE user_id = ?";
+            String sql = "SELECT * FROM [User] WHERE name = ?";
             Connection conn = DbUtils.getConnection();
             PreparedStatement pre = conn.prepareStatement(sql);
-            pre.setString(1, userName);
-            ResultSet rs = pre.executeQuery();
+            pre.setString(1, username);
 
-            while (rs.next()) {
-                int id = rs.getByte("userId");
-                String name = rs.getString("mane");
+            ResultSet rs = pre.executeQuery();
+            if (rs.next()) {
+                int id = rs.getInt("user_id");
+                String name = rs.getString("name");
                 String email = rs.getString("email");
                 String pass = rs.getString("password");
                 String address = rs.getString("address");
-                String phoneNumber = rs.getString("phoneNumber");
+                String phoneNumber = rs.getString("phone_number");
                 String role = rs.getString("role");
-                Timestamp createAt = rs.getTimestamp("createAt");
+                Timestamp createdAt = rs.getTimestamp("created_at");
 
-                user = new UserDTO(id, name, email, pass, address, phoneNumber, role, createAt);
+                user = new UserDTO(id, name, email, pass, address, phoneNumber, role, createdAt);
             }
+
             rs.close();
             pre.close();
             conn.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
+
         return user;
     }
 
